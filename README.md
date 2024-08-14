@@ -7,7 +7,7 @@ The OpenPanel Swift SDK allows you to integrate OpenPanel analytics into your iO
 - Easy-to-use API for tracking events and user properties
 - Automatic collection of app states
 - Support for custom event properties
-- Thread-safe operations
+- Shared instance for easy access throughout your app
 
 ## Requirements
 
@@ -40,13 +40,13 @@ dependencies: [
 First, import the SDK in your Swift file:
 
 ```swift
-import OpenPanelSwift
+import OpenPanel
 ```
 
-Then, initialize the OpenPanel instance with your client ID:
+Then, initialize the OpenPanel SDK with your client ID:
 
 ```swift
-let openPanel = OpenPanel(options: .init(
+OpenPanel.initialize(options: .init(
     clientId: "YOUR_CLIENT_ID",
     clientSecret: "YOUR_CLIENT_SECRET"
 ))
@@ -57,7 +57,7 @@ let openPanel = OpenPanel(options: .init(
 To track an event:
 
 ```swift
-openPanel.track(name: "Button Clicked", properties: ["button_id": "submit_form"])
+OpenPanel.track(name: "Button Clicked", properties: ["button_id": "submit_form"])
 ```
 
 ### Identifying Users
@@ -65,7 +65,7 @@ openPanel.track(name: "Button Clicked", properties: ["button_id": "submit_form"]
 To identify a user:
 
 ```swift
-openPanel.identify(payload: IdentifyPayload(
+OpenPanel.identify(payload: IdentifyPayload(
     profileId: "user123",
     firstName: "John",
     lastName: "Doe",
@@ -79,7 +79,7 @@ openPanel.identify(payload: IdentifyPayload(
 To set properties that will be sent with every event:
 
 ```swift
-openPanel.setGlobalProperties([
+OpenPanel.setGlobalProperties([
     "app_version": "1.0.2",
     "environment": "production"
 ])
@@ -90,7 +90,7 @@ openPanel.setGlobalProperties([
 To create an alias for a user:
 
 ```swift
-openPanel.alias(payload: AliasPayload(profileId: "user123", alias: "u123"))
+OpenPanel.alias(payload: AliasPayload(profileId: "user123", alias: "u123"))
 ```
 
 ### Incrementing Properties
@@ -98,7 +98,7 @@ openPanel.alias(payload: AliasPayload(profileId: "user123", alias: "u123"))
 To increment a numeric property:
 
 ```swift
-openPanel.increment(payload: IncrementPayload(profileId: "user123", property: "login_count"))
+OpenPanel.increment(payload: IncrementPayload(profileId: "user123", property: "login_count"))
 ```
 
 ### Decrementing Properties
@@ -106,17 +106,17 @@ openPanel.increment(payload: IncrementPayload(profileId: "user123", property: "l
 To decrement a numeric property:
 
 ```swift
-openPanel.decrement(payload: DecrementPayload(profileId: "user123", property: "credits_remaining"))
+OpenPanel.decrement(payload: DecrementPayload(profileId: "user123", property: "credits_remaining"))
 ```
 
 ## Advanced Usage
 
 ### Disabling Tracking
 
-You can temporarily disable tracking:
+You can temporarily disable tracking during initialization:
 
 ```swift
-openPanel = OpenPanel(options: .init(
+OpenPanel.initialize(options: .init(
     clientId: "YOUR_CLIENT_ID",
     clientSecret: "YOUR_CLIENT_SECRET",
     disabled: true
@@ -125,10 +125,10 @@ openPanel = OpenPanel(options: .init(
 
 ### Custom Event Filtering
 
-You can set up custom event filtering:
+You can set up custom event filtering during initialization:
 
 ```swift
-openPanel = OpenPanel(options: .init(
+OpenPanel.initialize(options: .init(
     clientId: "YOUR_CLIENT_ID",
     clientSecret: "YOUR_CLIENT_SECRET",
     filter: { payload in
@@ -142,14 +142,6 @@ openPanel = OpenPanel(options: .init(
 
 The OpenPanel SDK is designed to be thread-safe. You can call its methods from any thread without additional synchronization.
 
-## Logging
+## Automatic Tracking
 
-By default, the SDK logs errors and warnings. You can customize the logging level if needed.
-
-## Support
-
-For any issues or feature requests, please file an issue on our [GitHub repository](https://github.com/Openpanel-dev/openpanel/issues).
-
-## License
-
-OpenPanel Swift SDK is available under the MIT license. See the LICENSE file for more info.
+The SDK automatically tracks app lifecycle events (`app_opened` and `app_closed`) if `automaticTracking` is set to `true` during initialization.

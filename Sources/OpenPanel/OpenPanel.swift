@@ -43,7 +43,7 @@ internal class DeviceInfo {
             userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS \(systemVersion.replacingOccurrences(of: ".", with: "_")) like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
         }
         
-        return userAgent + " OpenPanelSwift/\(OpenPanel.sdkVersion)"
+        return userAgent + " OpenPanel/\(OpenPanel.sdkVersion)"
     }
     
     private static func getMacOSUserAgent() -> String {
@@ -235,6 +235,8 @@ public struct AnyCodable: Codable {
 // MARK: - OpenPanel Class
 
 public class OpenPanel {
+    public static let shared = OpenPanel()
+    
     private let api: Api
     private var profileId: String?
     private let globalQueue = DispatchQueue(label: "com.openpanel.globalQueue", attributes: .concurrent)
@@ -266,15 +268,21 @@ public class OpenPanel {
         }
     }
     
-    private var options: Options
+    private var options: Options?
     
     public static var sdkVersion: String {
         return "0.0.1"
     }
     
-    public init(options: Options) {
-        self.options = options
-                
+    private init() {
+        self.api = Api(config: Api.Config(baseUrl: "https://api.openpanel.dev"))
+        self.operationQueue = OperationQueue()
+        self.operationQueue.maxConcurrentOperationCount = 1
+    }
+    
+    public static func initialize(options: Options) {
+        shared.options = options
+        
         var defaultHeaders: [String: String] = [
             "openpanel-client-id": options.clientId,
             "openpanel-sdk-name": "swift",
@@ -286,25 +294,27 @@ public class OpenPanel {
             defaultHeaders["openpanel-client-secret"] = clientSecret
         }
         
-        self.api = Api(config: Api.Config(
+        shared.api.updateConfig(Api.Config(
             baseUrl: options.apiUrl ?? "https://api.openpanel.dev",
             defaultHeaders: defaultHeaders
         ))
-        
-        self.operationQueue = OperationQueue()
-        self.operationQueue.maxConcurrentOperationCount = 1 // Process operations sequentially
 
         if options.automaticTracking == true {
-            setupAutomaticTracking()
+            shared.setupAutomaticTracking()
         }
     }
     
-    public func ready() {
-        options.waitForProfile = false
-        flush()
+    public static func ready() {
+        shared.options?.waitForProfile = false
+        shared.flush()
     }
     
     private func send(_ payload: TrackHandlerPayload) {
+        guard let options = self.options else {
+            logError("OpenPanel not initialized. Call OpenPanel.initialize() first.")
+            return
+        }
+        
         if options.disabled == true {
             return
         }
@@ -345,22 +355,22 @@ public class OpenPanel {
         }
     }
     
-    public func setGlobalProperties(_ properties: [String: Any]) {
-        globalQueue.async(flags: .barrier) {
-            if var global = self._global {
+    public static func setGlobalProperties(_ properties: [String: Any]) {
+        shared.globalQueue.async(flags: .barrier) {
+            if var global = shared._global {
                 for (key, value) in properties {
                     global[key] = value
                 }
-                self._global = global
+                shared._global = global
             } else {
-                self._global = properties
+                shared._global = properties
             }
         }
     }
     
-    public func track(name: String, properties: TrackProperties? = nil) {
-        let mergedProperties = globalQueue.sync {
-            var merged = self._global ?? [:]
+    public static func track(name: String, properties: TrackProperties? = nil) {
+        let mergedProperties = shared.globalQueue.sync {
+            var merged = shared._global ?? [:]
             if let properties = properties {
                 merged.merge(properties) { (_, new) in new }
             }
@@ -369,19 +379,19 @@ public class OpenPanel {
         let payload = TrackPayload(
             name: name,
             properties: mergedProperties.mapValues { AnyCodable($0) },
-            profileId: properties?["profileId"] as? String ?? profileId
+            profileId: properties?["profileId"] as? String ?? shared.profileId
         )
-        send(.track(payload))
+        shared.send(.track(payload))
     }
     
-    public func identify(payload: IdentifyPayload) {
-        self.profileId = payload.profileId
-        flush()
+    public static func identify(payload: IdentifyPayload) {
+        shared.profileId = payload.profileId
+        shared.flush()
         
         if payload.firstName != nil || payload.lastName != nil || payload.email != nil || payload.avatar != nil || !(payload.properties?.isEmpty ?? true) {
             var updatedPayload = payload
-            globalQueue.sync {
-                if let global = self._global {
+            shared.globalQueue.sync {
+                if let global = shared._global {
                     var mergedProperties = global
                     if let payloadProperties = payload.properties {
                         mergedProperties.merge(payloadProperties) { (_, new) in (new as AnyObject).value }
@@ -389,26 +399,26 @@ public class OpenPanel {
                     updatedPayload.properties = mergedProperties.mapValues { AnyCodable($0) }
                 }
             }
-            send(.identify(updatedPayload))
+            shared.send(.identify(updatedPayload))
         }
     }
     
-    public func alias(payload: AliasPayload) {
-        send(.alias(payload))
+    public static func alias(payload: AliasPayload) {
+        shared.send(.alias(payload))
     }
     
-    public func increment(payload: IncrementPayload) {
-        send(.increment(payload))
+    public static func increment(payload: IncrementPayload) {
+        shared.send(.increment(payload))
     }
     
-    public func decrement(payload: DecrementPayload) {
-        send(.decrement(payload))
+    public static func decrement(payload: DecrementPayload) {
+        shared.send(.decrement(payload))
     }
     
-    public func clear() {
-        profileId = nil
-        globalQueue.async(flags: .barrier) {
-            self._global = nil
+    public static func clear() {
+        shared.profileId = nil
+        shared.globalQueue.async(flags: .barrier) {
+            shared._global = nil
         }
     }
     
@@ -419,7 +429,12 @@ public class OpenPanel {
             send(item)
         }
     }
+    
+    public static func flush() {
+        shared.flush()
+    }
 
+    
     private func setupAutomaticTracking() {
         #if os(iOS) || os(tvOS)
         NotificationCenter.default.addObserver(
@@ -457,28 +472,26 @@ public class OpenPanel {
             UIApplication.shared.connectedScenes.filter({ $0.activationState == .foregroundActive }).count == 1 else {
             return
         }
-        track(name: "app_opened")
+        OpenPanel.track(name: "app_opened")
     }
 
     @objc private func sceneDidEnterBackground(_ notification: Notification) {
         guard UIApplication.shared.connectedScenes.filter({ $0.activationState != .background }).isEmpty else {
             return
         }
-        track(name: "app_closed")
+        OpenPanel.track(name: "app_closed")
     }
     #elseif os(macOS)
     @objc private func appDidBecomeActive() {
-        track(name: "app_opened")
+        OpenPanel.track(name: "app_opened")
     }
 
     @objc private func appWillTerminate() {
-        track(name: "app_closed")
+        OpenPanel.track(name: "app_closed")
     }
     #endif
 
-    
     private func logError(_ message: String) {
-        // Implement your logging mechanism here
         print("OpenPanel Error: \(message)")
     }
 }
@@ -486,10 +499,10 @@ public class OpenPanel {
 // MARK: - Api Class
 
 internal class Api {
-    private let baseUrl: String
+    private var baseUrl: String
     private var headers: [String: String]
-    private let maxRetries: Int
-    private let initialRetryDelay: TimeInterval
+    private var maxRetries: Int
+    private var initialRetryDelay: TimeInterval
     
     struct Config {
         let baseUrl: String
@@ -499,6 +512,14 @@ internal class Api {
     }
     
     init(config: Config) {
+        self.baseUrl = config.baseUrl
+        self.headers = config.defaultHeaders ?? [:]
+        self.headers["Content-Type"] = "application/json"
+        self.maxRetries = config.maxRetries ?? 3
+        self.initialRetryDelay = config.initialRetryDelay ?? 0.5
+    }
+    
+    func updateConfig(_ config: Config) {
         self.baseUrl = config.baseUrl
         self.headers = config.defaultHeaders ?? [:]
         self.headers["Content-Type"] = "application/json"
