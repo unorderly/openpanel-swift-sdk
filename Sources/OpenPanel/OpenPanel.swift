@@ -21,31 +21,48 @@ internal class DeviceInfo {
     }
     
     private static func getiOSUserAgent() -> String {
-        let webView = WKWebView(frame: .zero)
-        var userAgent = ""
-        
-        let semaphore = DispatchSemaphore(value: 0)
-        
-        DispatchQueue.main.async {
-            webView.evaluateJavaScript("navigator.userAgent") { (result, error) in
-                if let agent = result as? String {
-                    userAgent = agent
+        if let _ = NSClassFromString("WKWebView") {
+            let webView = WKWebView(frame: .zero)
+            var userAgent = ""
+            
+            let semaphore = DispatchSemaphore(value: 0)
+            
+            DispatchQueue.main.async {
+                webView.evaluateJavaScript("navigator.userAgent") { (result, error) in
+                    if let agent = result as? String {
+                        userAgent = agent
+                    }
+                    semaphore.signal()
                 }
-                semaphore.signal()
             }
+            
+            _ = semaphore.wait(timeout: .now() + 1.0)
+            
+            if userAgent.isEmpty {
+                userAgent = getBasicUserAgent()
+            }
+            
+            return userAgent + " OpenPanel/\(OpenPanel.sdkVersion)"
+        } else {
+            return getBasicUserAgent()
         }
-        
-        _ = semaphore.wait(timeout: .now() + 1.0)
-        
-        if userAgent.isEmpty {
-            let device = UIDevice.current
-            let systemVersion = device.systemVersion
-            userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS \(systemVersion.replacingOccurrences(of: ".", with: "_")) like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
-        }
-        
-        return userAgent + " OpenPanel/\(OpenPanel.sdkVersion)"
     }
-    
+
+    private static func getBasicUserAgent() -> String {
+        let device = UIDevice.current
+        let systemVersion = device.systemVersion
+        let model = device.model
+        let systemName = device.systemName
+
+        // Construct a user agent string manually with more detailed information
+        var userAgent = "Mozilla/5.0 (\(model); \(systemName) \(systemVersion.replacingOccurrences(of: ".", with: "_")); like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/\(systemVersion)"
+
+        // Append your custom string if necessary
+        userAgent += " OpenPanel/\(OpenPanel.sdkVersion)"
+
+        return userAgent
+    }
+
     private static func getMacOSUserAgent() -> String {
         let processInfo = ProcessInfo.processInfo
         let osVersion = processInfo.operatingSystemVersionString
