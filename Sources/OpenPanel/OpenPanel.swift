@@ -20,8 +20,12 @@ internal class DeviceInfo {
         #endif
     }
     
+    private static func isRunningInExtension() -> Bool {
+        return Bundle.main.bundlePath.hasSuffix(".appex")
+    }
+    
     private static func getiOSUserAgent() -> String {
-        if let _ = NSClassFromString("WKWebView") {
+        if !isRunningInExtension() {
             let webView = WKWebView(frame: .zero)
             var userAgent = ""
             
