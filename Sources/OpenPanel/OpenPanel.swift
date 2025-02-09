@@ -41,12 +41,14 @@ internal class DeviceInfo {
             }
             
             _ = semaphore.wait(timeout: .now() + 1.0)
+
+            userAgent += " OpenPanel/\(OpenPanel.sdkVersion)"
             
             if userAgent.isEmpty {
                 userAgent = getBasicUserAgent()
             }
             
-            return userAgent + " OpenPanel/\(OpenPanel.sdkVersion)"
+            return userAgent
         } else {
             return getBasicUserAgent()
         }
@@ -75,12 +77,12 @@ internal class DeviceInfo {
         
         let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X \(version.replacingOccurrences(of: ".", with: "_"))) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15"
         
-        return userAgent + " OpenPanelSDK/\(OpenPanel.sdkVersion)"
+        return userAgent + " OpenPanel/\(OpenPanel.sdkVersion)"
     }
     
     private static func getGenericUserAgent() -> String {
         let osName = ProcessInfo.processInfo.operatingSystemVersionString
-        return "OpenPanelSDK/\(OpenPanel.sdkVersion) (\(osName))"
+        return "OpenPanel/\(OpenPanel.sdkVersion) (\(osName))"
     }
 }
 
