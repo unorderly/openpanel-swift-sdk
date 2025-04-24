@@ -154,6 +154,40 @@ public struct TrackPayload: Codable {
 
 public typealias TrackProperties = [String: Any]
 
+extension AnyCodable:
+    ExpressibleByStringLiteral,
+    ExpressibleByBooleanLiteral,
+    ExpressibleByIntegerLiteral,
+    ExpressibleByFloatLiteral,
+    ExpressibleByArrayLiteral,
+    ExpressibleByDictionaryLiteral
+{
+    public init(stringLiteral value: String) {
+        self = AnyCodable(value)
+    }
+
+    public init(booleanLiteral value: Bool) {
+        self = AnyCodable(value)
+    }
+
+    public init(integerLiteral value: Int) {
+        self = AnyCodable(value)
+    }
+
+    public init(floatLiteral value: Double) {
+        self = AnyCodable(value)
+    }
+
+    public init(arrayLiteral elements: AnyCodable...) {
+        self = AnyCodable(elements)
+    }
+
+    public init(dictionaryLiteral elements: (String, AnyCodable)...) {
+        let dict = Dictionary(elements, uniquingKeysWith: { first, _ in first })
+        self = AnyCodable(dict)
+    }
+}
+
 public struct IdentifyPayload: Codable {
     public let profileId: String
     public var firstName: String?
@@ -244,6 +278,10 @@ public struct AnyCodable: Codable {
         case let value as Double:
             try container.encode(value)
         case let value as Bool:
+            try container.encode(value)
+        case let value as [AnyCodable]:
+            try container.encode(value)
+        case let value as [String: AnyCodable]:
             try container.encode(value)
         case let value as [Any]:
             try container.encode(value.map { AnyCodable($0) })
