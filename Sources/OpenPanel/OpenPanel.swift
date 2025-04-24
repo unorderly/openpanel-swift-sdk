@@ -279,6 +279,10 @@ public struct AnyCodable: Codable {
             try container.encode(value)
         case let value as Bool:
             try container.encode(value)
+        case let value as [AnyCodable]:
+            try container.encode(value)
+        case let value as [String: AnyCodable]:
+            try container.encode(value)
         case let value as [Any]:
             try container.encode(value.map { AnyCodable($0) })
         case let value as [String: Any]:
