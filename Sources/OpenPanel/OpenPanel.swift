@@ -625,6 +625,7 @@ public class OpenPanel {
             "__version": DeviceInfo.appVersion,
             "__build": DeviceInfo.buildNumber,
             "__language": DeviceInfo.appLanguage,
+            "__system_language": DeviceInfo.preferredLanguage,
             "__locale": DeviceInfo.locale,
             "__timezone": DeviceInfo.timeZone,
         ]
