@@ -39,8 +39,6 @@ internal class DeviceInfo {
     static var isAppStore: Bool {
         #if DEBUG
             return false
-        #elseif TARGET_OS_OSX || TARGET_OS_MACCATALYST
-            return false
         #elseif targetEnvironment(simulator)
             return false
         #else
@@ -106,7 +104,9 @@ internal class DeviceInfo {
             case .tv: return "Apple TV"
             case .carPlay: return "CarPlay"
             case .vision: return "Apple Vision"
-            default: return "Unknown"
+            case .phone: return "iPhone"
+            case .unspecified: return "Unknown"
+            @unknown default: return "Unknown"
             }
         }
 #endif
@@ -279,14 +279,16 @@ internal class DeviceInfo {
         return preferredLocaleIdentifier.components(separatedBy: .init(charactersIn: "-_"))[0]
     }
 
+    static var appName: String {
+        Bundle.main.infoDictionary?["CFBundleName"] as? String ?? Bundle.main.bundleIdentifier ?? "UnknownApp"
+    }
+
     // Updated getUserAgent to generate a more standard-like UA string
     // Aiming for better compatibility with ua-parser-js used server-side
     // See: https://github.com/Openpanel-dev/openpanel/raw/refs/heads/main/packages/common/server/parser-user-agent.ts
     static func getUserAgent() -> String {
         // Use CFBundleName if available, otherwise fallback to bundleIdentifier
-        let appName =
-            Bundle.main.infoDictionary?["CFBundleName"] as? String ?? Bundle.main.bundleIdentifier
-            ?? "UnknownApp"
+        let appName = DeviceInfo.appName
         let appVersion = DeviceInfo.appVersion
         let buildNumber = DeviceInfo.buildNumber
         let sdkVersion = OpenPanel.sdkVersion
@@ -622,8 +624,10 @@ public class OpenPanel {
             "__model": DeviceInfo.modelName,
             "__brand": DeviceInfo.brand,
 
+            "__browser": DeviceInfo.appName,
             "__version": DeviceInfo.appVersion,
-            "__build": DeviceInfo.buildNumber,
+            "__browserVersion": DeviceInfo.appVersion,
+            "__buildNumber": DeviceInfo.buildNumber,
             "__language": DeviceInfo.appLanguage,
             "__system_language": DeviceInfo.preferredLanguage,
             "__locale": DeviceInfo.locale,
@@ -757,9 +761,7 @@ public class OpenPanel {
                 if let global = shared._global {
                     var mergedProperties = global
                     if let payloadProperties = payload.properties {
-                        mergedProperties.merge(payloadProperties) { (_, new) in
-                            (new as AnyObject).value
-                        }
+                        mergedProperties.merge(payloadProperties) { (_, new) in new }
                     }
                     updatedPayload.properties = mergedProperties.mapValues { AnyCodable($0) }
                 }
