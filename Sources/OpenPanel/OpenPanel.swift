@@ -672,7 +672,7 @@ public class OpenPanel {
 
     private func send(_ payload: TrackHandlerPayload) {
         guard let options = self.options else {
-            logError("OpenPanel not initialized. Call OpenPanel.initialize() first.")
+            Self.logError("OpenPanel not initialized. Call OpenPanel.initialize() first.")
             return
         }
 
@@ -697,7 +697,7 @@ public class OpenPanel {
                 case .success:
                     break
                 case .failure(let error):
-                    self.logError("Error sending payload: \(error)")
+                    Self.logError("Error sending payload: \(error)")
                 }
             }
         }
@@ -863,9 +863,18 @@ public class OpenPanel {
         }
     #endif
 
-    private func logError(_ message: String) {
-        print("OpenPanel Error: \(message)")
+    static func logError(_ message: String, file: String = #file, line: UInt = #line, function: String = #function) {
+        print("[\(file):\(line) \(function)] \(Date()): 🚨 \(message)")
     }
+
+    static func logWarning(_ message: String, file: String = #file, line: UInt = #line, function: String = #function) {
+        print("[\(file):\(line) \(function)] \(Date()): ⚠️ \(message)")
+    }
+
+    static func log(_ message: String, file: String = #file, line: UInt = #line, function: String = #function) {
+        print("[\(file):\(line) \(function)] \(Date()): \(message)")
+    }
+
 }
 
 // MARK: - Api Class
@@ -928,12 +937,11 @@ internal class Api {
             }
         }
 
-        print("OpenPanel:", "Sending", String(data: request.httpBody ?? Data(), encoding: .utf8) ?? "", headers)
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("OpenPanel:", "Invalid response")
+                OpenPanel.logWarning("Invalid response \(response)")
                 return .failure(
                     NSError(
                         domain: "HTTPError", code: 0,
@@ -941,7 +949,6 @@ internal class Api {
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
-                print("OpenPanel:", "HTTP error: \(httpResponse.statusCode)")
                 return .failure(
                     NSError(
                         domain: "HTTPError", code: httpResponse.statusCode,
@@ -949,8 +956,6 @@ internal class Api {
                             NSLocalizedDescriptionKey: "HTTP error: \(httpResponse.statusCode)"
                         ]))
             }
-
-            print("OpenPanel:", "Success", String(data: data, encoding: .utf8) ?? "")
 
             return .success(data)
         } catch {
